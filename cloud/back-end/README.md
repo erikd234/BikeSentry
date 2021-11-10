@@ -1,2 +1,4 @@
 # BikeSentry
- A anti-theft device for bicycles locked to bike racks. Uses ML and audio recognition to detect the sound of an angle grinder cutting a lock and send text alerts to subscribers of the bike tower. 
+ To start venv run 
+1. Set-ExecutionPolicy Unrestricted -Scope Process
+2. .venv\scripts\activate inflasr proj dir.

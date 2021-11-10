@@ -1,10 +1,15 @@
+import LandingPage from "./pages/landingpage/LandingPage";
+import AddNumberPage from "./pages/addnumberpage/AddNumberPage";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+
 function App() {
   return (
-    <div className='App'>
-      <header className='App-header'>
-        <h1>Welcome to Bike-sentry!</h1>
-      </header>
-    </div>
+    <Router>
+      <Routes>
+        <Route path='/' element={<LandingPage />} />
+        <Route path='/addnumber/:towerId' element={<AddNumberPage />} />
+      </Routes>
+    </Router>
   );
 }
 
