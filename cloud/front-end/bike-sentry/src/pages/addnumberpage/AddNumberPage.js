@@ -3,45 +3,57 @@
  */
 
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
+import "./AddNumberPage.css";
 
 function AddNumberPage(props) {
   let [text, setText] = useState("");
   const { towerId } = useParams();
-  const search = (query) => {
-    if (query.length === 0) return;
-    const urlSafeQuery = encodeURI(query);
+  const locationHook = useLocation();
+  const { name, location } = locationHook.state;
+  const search = (number) => {
+    if (number.length === 0) return;
+    const urlSafeQuery = encodeURI(number);
+    document.getElementById("addNumberInput").value = "";
     const options = {
       url: `http://127.0.0.1:5000/addnumber/${towerId}?number=${urlSafeQuery}`, // TODO Add the right port number
     };
     axios(options)
       .then((response) => {
-        setText("");
         window.alert(response.data.message);
       })
       .catch((err) => {
-        setText("");
-        window.alert("failure");
         console.log(err);
       });
   };
   return (
-    <div>
-      <input
-        type='text'
-        onChange={(e) => {
-          setText(e.target.value);
-        }}
-      />
-      <input
-        onClick={() => {
-          search(text);
-        }}
-        type='button'
-        value='Add Number'
-      />
-      <Link to='/'>Go back</Link>
+    <div className='number-page-center'>
+      <div className='number-page-top-margin'>
+        <h1> {name} </h1>
+        <h3> @ {location} </h3>
+        <h4>Add your phone number to subscribe...</h4>
+        <input
+          id='addNumberInput'
+          type='text'
+          onChange={(e) => {
+            setText(e.target.value);
+          }}
+        />
+        <div className='number-page-small-margin'>
+          <input
+            onClick={() => {
+              search(text);
+            }}
+            type='button'
+            value='Add Number'
+          />
+        </div>
+
+        <div className='top-margin'>
+          <Link to='/'>Go back</Link>
+        </div>
+      </div>
     </div>
   );
 }
