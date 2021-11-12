@@ -4,8 +4,11 @@
 #
 from flask import Flask
 from flask import request
+from flask_cors import CORS
+from flask import jsonify
 
 app = Flask(__name__)
+CORS(app)
 
 
 @app.route("/")
@@ -41,9 +44,18 @@ def resolve_theft(tower_id):
 
 @app.route("/getsentrytowers")
 def get_sentry_towers():
-    return {"test_sentry": {
-        "tower_location": "Testing Room", # for front end display
+    # convert tree structure of towers to a list
+    tower_tree = {"000000": {
+        "tower_location": "Testing Room",  # for front end display
         "status": "Offline",  # For front end display
-        "tower_id": "1",
+        "tower_id": "000000",
+        "tower_name": "Test Sentry",
         "phone_numbers": ["1234567890", "9876543210"]
     }}
+    tower_list = []
+    for towers_id, tower_dict in tower_tree.items():
+        # Don't share phone numbers with front-end
+        del tower_dict["phone_numbers"]
+        tower_list.append(tower_dict)
+
+    return jsonify(tower_list)

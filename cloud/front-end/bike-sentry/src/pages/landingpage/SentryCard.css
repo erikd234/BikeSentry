@@ -1,0 +1,34 @@
+.card-top-margin {
+  margin-top: 30px;
+}
+
+.box-border-thin {
+  border: 1px solid grey;
+  padding: 20px;
+}
+
+.no-decoration {
+  text-decoration: none;
+  color: black;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.flex {
+  display: flex;
+  justify-content: space-evenly;
+}
+
+.card-item {
+  padding: 2px;
+}
+
+.card-link {
+  background-color: lightpink;
+}
+
+.card-link:hover {
+  background-color: rgba(84, 171, 187, 0.685);
+}

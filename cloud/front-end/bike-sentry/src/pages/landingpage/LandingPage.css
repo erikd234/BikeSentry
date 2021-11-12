@@ -1,0 +1,16 @@
+.top-margin {
+  margin-top: 160px;
+}
+
+.center {
+  display: flex;
+  justify-content: center;
+}
+
+.center-text {
+  text-align: center;
+}
+
+.shield-logo {
+  width: 100px;
+}
