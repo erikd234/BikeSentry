@@ -10,3 +10,8 @@ To start dev mode when already in .venv console (.venv powershell)
 To start in prod mode when in .venv console (cmd)
 1. `s$env:FLASK_ENV = "development`
 2. `flask run`
+
+To start ngrok
+1. Have ngrok installed and add ngrok key to .env
+2. run ngrok http 5000 (or whatever port server is on)
+3. to stop when done `taskkill /f /im ngrok.exe`

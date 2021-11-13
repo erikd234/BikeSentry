@@ -17,6 +17,7 @@ from twilio.twiml.messaging_response import MessagingResponse
 
 load_dotenv()
 
+THEFT_CONTROL_PASSWORD = os.getenv("THEFT_CONTROL_PASSWORD")
 TWILIO_FROM_NUMBER = "+12054967415"
 GCP_CREDENTIALS_PATH = os.getenv("GCP_CREDENTIALS_PATH")
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
@@ -79,19 +80,7 @@ def add_number(tower_id):
     return {"status": "success", "message": f"{number_formatted} is now listening to the tower."}
 
 
-@app.route("/sms", methods=['GET', 'POST'])
-def sms_reply():
-    """Respond to incoming calls with a simple text message."""
-    # Start our TwiML response
-    resp = MessagingResponse()
-
-    # Add a message
-    resp.message("The Robots are coming! Head for the hills!")
-
-    return str(resp)
-
-
-# This will be called by Twilio somehow.
+# This will be called by Twilio through their webhook API (running on local needs ngrok).
 @app.route("/removenumber", methods=['POST'])
 def remove_number():
     # Start our TwiML response
@@ -136,7 +125,9 @@ def remove_number():
 @app.route("/theft_alert/<tower_id>",  methods=['POST'])
 def theft_alert(tower_id):
     # Grab all the listeners for the given tower ID
-
+    password = request.form["password"]
+    if password != THEFT_CONTROL_PASSWORD:
+        return {"status": "failure", "message": "Invalid Password."}
     doc = db.collection("tower_list").document(tower_id).get()
     tower_info = doc.to_dict()
     tower_name = tower_info["tower_name"]
@@ -163,6 +154,9 @@ def theft_alert(tower_id):
 
 @app.route("/resolve_theft/<tower_id>",  methods=['POST'])
 def resolve_theft(tower_id):
+    password = request.form["password"]
+    if password != THEFT_CONTROL_PASSWORD:
+        return {"status": "failure", "message": "Invalid Password."}
     doc = db.collection("tower_list").document(tower_id).get()
 
     if not doc.exists:
