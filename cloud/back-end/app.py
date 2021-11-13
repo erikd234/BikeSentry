@@ -68,7 +68,7 @@ def add_number(tower_id):
 
     phone_numbers_list.append(number_formatted)
     thanks_for_subscribing_message = f"Thanks for subscribing to {tower_name} @ {tower_location}. You are making both \
-                                     your bike, and those around you safer!"
+                                     your bike, and those around you safer! (reply to this message to unsubscribe)"
     message = twilio_client.messages \
         .create(
             body=thanks_for_subscribing_message,
@@ -92,42 +92,54 @@ def sms_reply():
 
 
 # This will be called by Twilio somehow.
-@app.route("/removenumber/<tower_id>")
-def remove_number(tower_id):
+@app.route("/removenumber", methods=['POST'])
+def remove_number():
+    # Start our TwiML response
+    resp = MessagingResponse()
+
     # First off check that the number is valid
-    number = request.args.get("number")
+    number = request.form["From"]
     num_obj = phonenumbers.parse(number, "US")
     if not phonenumbers.is_valid_number(num_obj) or not phonenumbers.is_possible_number(num_obj):
-        return {"status": "failure", "message": f"{number} is an invalid number."}
-    number_formatted = phonenumbers.format_number(num_obj, phonenumbers.PhoneNumberFormat.NATIONAL)
+        # this should not happen but it would help with errors.
+        resp.message(f"{number} is an invalid number.")
+        return str(resp)
 
+    number_formatted = phonenumbers.format_number(num_obj, phonenumbers.PhoneNumberFormat.NATIONAL)
+    tower_id = "T0"
     # Now up grab tower by its ID
     doc_ref = db.collection("tower_list").document(tower_id)
     doc = doc_ref.get()
     if not doc.exists:
-        return {"status": "failure", "message": f"Tower {tower_id} does not exist!"}
+        resp.message(f"Tower {tower_id} does not exist!")
+        return str(resp)
+
     tower_info = doc.to_dict()
+    tower_name = tower_info["tower_name"]
     phone_numbers_list = tower_info["phone_numbers"]
 
     if number_formatted not in phone_numbers_list:
-        return {"status": "success", "message": f"{number_formatted} is not listening to the tower."}
+        resp.message(f"{number_formatted} is not listening to the tower.")
+        return str(resp)
 
     # Remove the number
     tower_info["phone_numbers"] = [i for i in phone_numbers_list if i != number_formatted]
     db.collection("tower_list").document(tower_id).set(tower_info)
 
-    return {"status": "success", "message": f"{number_formatted} is no longer listening to the tower."}
+    # Add a message
+    resp.message(f"{number_formatted} has unsubscribed to the tower!")
+    return str(resp)
 
 
 # Sent from tower, to API to trigger text alerts for a given tower.
 # Updates the status of given tower to "Theft Detected".
-@app.route("/theft_alert/<tower_id>")
+@app.route("/theft_alert/<tower_id>",  methods=['POST'])
 def theft_alert(tower_id):
     # Grab all the listeners for the given tower ID
 
     doc = db.collection("tower_list").document(tower_id).get()
     tower_info = doc.to_dict()
-    tower_name = tower_info["Name"]
+    tower_name = tower_info["tower_name"]
     tower_location = tower_info["tower_location"]
     tower_info["status"] = "THEFT IN PROGRESS!"
     # Update tower status!
@@ -149,8 +161,31 @@ def theft_alert(tower_id):
     return {"message": "Tried to send messages to all phone numbers"}
 
 
-@app.route("/resolve_theft/<tower_id>")
+@app.route("/resolve_theft/<tower_id>",  methods=['POST'])
 def resolve_theft(tower_id):
+    doc = db.collection("tower_list").document(tower_id).get()
+
+    if not doc.exists:
+        return {"status": "failure", "message": "Tower {tower_id} does not exist!"}
+
+    tower_info = doc.to_dict()
+    tower_name = tower_info["tower_name"]
+    tower_location = tower_info["tower_location"]
+    phone_numbers = tower_info["phone_numbers"]
+    theft_resolved_message = f"Theft at {tower_name} at {tower_location} has been resolved! Thanks for helping! "
+    if len(phone_numbers) == 0:
+        return {"message": "No phone numbers to send messages too :("}
+
+    for number in phone_numbers:
+        message = twilio_client.messages \
+            .create(
+            body=theft_resolved_message,
+            from_=TWILIO_FROM_NUMBER,
+            to=number,
+        )
+    tower_info["status"] = "Sentry Mode"
+    db.collection("tower_list").document(tower_id).set(tower_info)
+
     return {"status": "success", "message": f"Theft resolved, Tower {tower_id} is back on sentry mode"}
 
 
