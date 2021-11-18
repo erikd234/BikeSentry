@@ -2,7 +2,7 @@
  * Landing page for our Bike sentry Application.
  * User gets prompted to search for their bike sentry tower.
  */
-import axios from "axios";
+import axios from "../../axios";
 import SentryCard from "./SentryCard";
 import { useState, useEffect } from "react";
 import "./LandingPage.css";
@@ -12,7 +12,7 @@ function LandingPage() {
 
   useEffect(() => {
     const options = {
-      url: "http://127.0.0.1:5000/getsentrytowers",
+      url: "/getsentrytowers",
     };
     axios(options)
       .then((response) => {

@@ -18,18 +18,25 @@ from twilio.twiml.messaging_response import MessagingResponse
 load_dotenv()
 
 THEFT_CONTROL_PASSWORD = os.getenv("THEFT_CONTROL_PASSWORD")
-TWILIO_FROM_NUMBER = "+12054967415"
+TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER")
 GCP_CREDENTIALS_PATH = os.getenv("GCP_CREDENTIALS_PATH")
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+PORT_NUMBER = os.getenv("PORT_NUMBER")
+ENV = os.getenv("ENV")
 
 twilio_client = client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
-# Use a service account
-cred = credentials.Certificate(GCP_CREDENTIALS_PATH)
-firebase_admin.initialize_app(cred)
-
-db = firestore.client()
+try:
+    if ENV == "production":
+        firebase_admin.initialize_app()
+    else:
+        # Use a service account
+        cred = credentials.Certificate(GCP_CREDENTIALS_PATH)
+        firebase_admin.initialize_app(cred)
+    db = firestore.client()
+except:
+    print("Skipping firebase Auth")
 
 app = Flask(__name__)
 CORS(app)
@@ -72,10 +79,10 @@ def add_number(tower_id):
                                      your bike, and those around you safer! (reply to this message to unsubscribe)"
     message = twilio_client.messages \
         .create(
-            body=thanks_for_subscribing_message,
-            from_=TWILIO_FROM_NUMBER,
-            to=number,
-        )
+        body=thanks_for_subscribing_message,
+        from_=TWILIO_FROM_NUMBER,
+        to=number,
+    )
     db.collection("tower_list").document(tower_id).set(tower_info)
     return {"status": "success", "message": f"{number_formatted} is now listening to the tower."}
 
@@ -122,12 +129,12 @@ def remove_number():
 
 # Sent from tower, to API to trigger text alerts for a given tower.
 # Updates the status of given tower to "Theft Detected".
-@app.route("/theft_alert/<tower_id>",  methods=['POST'])
+@app.route("/theft_alert/<tower_id>", methods=['POST'])
 def theft_alert(tower_id):
     # Grab all the listeners for the given tower ID
-    password = request.form["password"]
-    if password != THEFT_CONTROL_PASSWORD:
-        return {"status": "failure", "message": "Invalid Password."}
+    # password = request.form["password"]
+    # if password != THEFT_CONTROL_PASSWORD:
+    #   return {"status": "failure", "message": "Invalid Password."}
     doc = db.collection("tower_list").document(tower_id).get()
     tower_info = doc.to_dict()
     tower_name = tower_info["tower_name"]
@@ -144,19 +151,19 @@ def theft_alert(tower_id):
     for number in phone_numbers:
         message = twilio_client.messages \
             .create(
-                body=theft_alert_message,
-                from_=TWILIO_FROM_NUMBER,
-                to=number,
-            )
+            body=theft_alert_message,
+            from_=TWILIO_FROM_NUMBER,
+            to=number,
+        )
 
     return {"message": "Tried to send messages to all phone numbers"}
 
 
-@app.route("/resolve_theft/<tower_id>",  methods=['POST'])
+@app.route("/resolve_theft/<tower_id>", methods=['POST'])
 def resolve_theft(tower_id):
-    password = request.form["password"]
-    if password != THEFT_CONTROL_PASSWORD:
-        return {"status": "failure", "message": "Invalid Password."}
+    # password = request.form["password"]
+    # if password != THEFT_CONTROL_PASSWORD:
+    #   return {"status": "failure", "message": "Invalid Password."}
     doc = db.collection("tower_list").document(tower_id).get()
 
     if not doc.exists:
@@ -195,3 +202,9 @@ def get_sentry_towers():
         tower_list.append(tower_dict)
 
     return jsonify(tower_list)
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(PORT_NUMBER))
+
+print("bike-sentry-api is running.")

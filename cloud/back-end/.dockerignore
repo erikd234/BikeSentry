@@ -1,0 +1,10 @@
+Dockerfile
+README.md
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+__pycache__
+.pytest_cache
+deploy.py

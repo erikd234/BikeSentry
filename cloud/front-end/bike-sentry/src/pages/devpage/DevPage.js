@@ -1,5 +1,5 @@
 import { useState } from "react";
-import axios from "axios";
+import axios from "../../axios";
 
 function DevPage() {
   let [text, setText] = useState("");
@@ -11,7 +11,7 @@ function DevPage() {
       password: password,
     };
     axios
-      .post("http://127.0.0.1:5000/theft_alert/T0", body)
+      .post("/theft_alert/T0", body)
       .then((response) => {
         window.alert(response.data.message);
       })
@@ -27,7 +27,7 @@ function DevPage() {
       password: password,
     };
     axios
-      .post("http://127.0.0.1:5000/resolve_theft/T0", body)
+      .post("/resolve_theft/T0", body)
       .then((response) => {
         window.alert(response.data.message);
       })

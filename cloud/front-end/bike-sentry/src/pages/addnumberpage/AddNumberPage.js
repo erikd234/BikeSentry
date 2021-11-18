@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 import { Link, useParams, useLocation } from "react-router-dom";
-import axios from "axios";
+import axios from "../../axios";
 import "./AddNumberPage.css";
 
 function AddNumberPage(props) {
@@ -17,7 +17,7 @@ function AddNumberPage(props) {
     const urlSafeQuery = encodeURI(number);
     document.getElementById("addNumberInput").value = "";
     const options = {
-      url: `http://127.0.0.1:5000/addnumber/${towerId}?number=${urlSafeQuery}`, // TODO Add the right port number
+      url: `/addnumber/${towerId}?number=${urlSafeQuery}`,
     };
     axios(options)
       .then((response) => {
