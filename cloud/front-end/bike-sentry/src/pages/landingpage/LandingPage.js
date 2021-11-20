@@ -40,7 +40,6 @@ function LandingPage() {
           );
         })}
       </div>
-      <div>Loading screen..</div>
     </div>
   );
 }
