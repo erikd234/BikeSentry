@@ -1,0 +1,3 @@
+audio_recognition contains jupyter notebooks with some audo processsing algorithms
+
+ros_ws stand for ROS workspace and contains the source code for our sentry tower control.
