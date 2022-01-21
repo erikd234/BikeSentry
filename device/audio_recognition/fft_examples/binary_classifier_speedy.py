@@ -15,6 +15,9 @@ import tensorflow as tf # attempting using tensorflow 2.5.0 to match the tflite_
 from pickle import dump
 import sklearn 
 import time 
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, accuracy_score
 
 
 def load_data():
@@ -159,16 +162,137 @@ def bin_chunks_Y(chunks_Y, bins):
 
     end = time.time()
     print(f"Runtime of bin_chunks_y is: {end - start}")
-    return chunks_Y_binned
+    return np.array(chunks_Y_binned)
+
+def scale_Y(chunks_grinder_Y: np.array, chunks_env_Y: np.array):
+    # scaling may be better to use log scale instead of this -1 to 1 scale but that can be fixed later
+    start = time.time()
+
+    sc = StandardScaler()
+    # first row is the bin values 
+    n_rows_g = chunks_grinder_Y.shape[0]
+    n_rows_e = chunks_env_Y.shape[0]
+
+    X_combined = np.vstack([chunks_grinder_Y, chunks_env_Y])
+    X_combined_scaled = sc.fit_transform(X_combined)
+    
+    X_g_scaled = X_combined_scaled[:n_rows_g, :]
+    X_e_scaled = X_combined_scaled[(n_rows_g):, :]
+
+    # save scaler for future realtime scaling
+    dump(sc, open('audio_scaler_speedy.pkl', 'wb'))
+    end = time.time()
+
+    print(f"Runtime of scale_Y is: {end - start}")
+
+    return X_g_scaled, X_e_scaled
+
+def categorize_data(X_grinder, X_env):
+    start = time.time()
+
+    class_0 = np.repeat(0, X_env.shape[0])
+    class_1 = np.repeat(1, X_grinder.shape[0])
+
+    classes_h = np.hstack([class_0, class_1])
+    # reshape to be vertical
+
+    classes = np.vstack(classes_h)
+    
+    end = time.time()
+
+    print(f"Runtime of categorize_data is: {end - start}")
+    return classes
+
+def split_data(X, y):
+    # can change this from not being dependent on sklearn if we want to know the training things but 
+    # no need to think about that now
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 1)
+
+    return X_train, X_test, y_train, y_test
+
+def build_ann(X):
+    nr_features = X.shape[1]
+    # Initialization
+    ann_clf = tf.keras.models.Sequential()
+
+    # Some arbitrary architecture for now
+    ann_clf.add(tf.keras.layers.Input(shape=nr_features))
+
+    ann_clf.add(tf.keras.layers.Dense(units=500, activation='relu'))
+    ann_clf.add(tf.keras.layers.Dropout(0.2))
+
+    ann_clf.add(tf.keras.layers.Dense(units=250, activation='relu'))
+    ann_clf.add(tf.keras.layers.Dropout(0.2))
+
+    ann_clf.add(tf.keras.layers.Dense(units=125, activation='relu'))
+    ann_clf.add(tf.keras.layers.Dropout(0.2))
+
+    ann_clf.add(tf.keras.layers.Dense(units=60, activation='relu'))
+    ann_clf.add(tf.keras.layers.Dropout(0.2))
+
+    ann_clf.add(tf.keras.layers.Dense(units=30, activation='relu'))
+    ann_clf.add(tf.keras.layers.Dropout(0.2))
+
+    ann_clf.add(tf.keras.layers.BatchNormalization())
+    ann_clf.add(tf.keras.layers.Dense(units=1, activation='sigmoid'))
+
+    # Compiling
+    ann_clf.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+
+    ann_clf.summary()
+
+    return ann_clf
+
+def validation_plots(h):
+    # summarize history for accuracy
+    plt.plot(h.history['accuracy'])
+    plt.plot(h.history['val_accuracy'])
+    plt.title('model accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
+    # summarize history for loss
+    plt.plot(h.history['loss'])
+    plt.plot(h.history['val_loss'])
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
+
+def validation_metrics(model, X_t, y_t):
+    y_p = (model.predict(X_t) > 0.5)
+    CM = confusion_matrix(y_t, y_p)
+    print('Confusion Matrix=', CM)
+
+    accuracy = accuracy_score(y_t, y_p)
+    print('Accuracy Score=', accuracy)
+
+def save_model_as_tflit(ann_clf):
+    ann_clf.save('angle-grinder-detector-2s.h5')
+    model = tf.keras.models.load_model('angle-grinder-detector-2s.h5')
+
+    #converting to tflite
+    converter = tf.lite.TFLiteConverter.from_keras_model(model)
+
+    #save tflite model
+    tflite_model = converter.convert()
+    open('angle-grinder-detector-2s.tflite', 'wb').write(tflite_model)
 
 if __name__ == "__main__":
     #### split audio data into chunks ####
+    # conclusion is we need more data
+    # Variable data parameters
+    SECONDS = 1
+    BINS = 500
+    #
 
     total_start = time.time()
 
     raw_data, raw_data_environment, sample_rate = load_data()
     floor_recordings(raw_data, raw_data_environment, sample_rate)
-    SECONDS = 1
+
     chunks_grinder = create_chunks(raw_data, sample_rate, SECONDS)
     chunks_env = create_chunks(raw_data_environment, sample_rate, SECONDS)
 
@@ -176,11 +300,35 @@ if __name__ == "__main__":
     chunks_grinder_Y, freqs_grinder  = raw_audio_to_freq(chunks_grinder, sample_rate)
     chunks_env_Y, freqs_env = raw_audio_to_freq(chunks_env, sample_rate)
 
-    BINS = 1000
-    chunks_grinder_Y_binned = bin_chunks_Y(chunks_grinder_Y, BINS)
-    chunks_env_Y_binned = bin_chunks_Y(chunks_env_Y, BINS)
+    # naming convention capital 'X' is concurrent with matrix notation
+    X_grinder = bin_chunks_Y(chunks_grinder_Y, BINS)
+    X_env = bin_chunks_Y(chunks_env_Y, BINS)
+
+    # scaling X's 
+    X_grinder_scaled, X_env_scaled = scale_Y(X_grinder, X_env)
+
+    # create categories for grinder and environment
+    y = categorize_data(X_grinder_scaled, X_env_scaled)
+    X = np.vstack([X_grinder_scaled, X_env_scaled])
+    
+    # split data to test and train groups
+    X_train, X_test, y_train, y_test = split_data(X, y)
+
+    # build ann model
+    ann = build_ann(X)
+
+    history = ann.fit(X_train, y_train, validation_data = (X_test, y_test), \
+        batch_size = 60, epochs = 150, \
+        verbose = 1)
+
+
+    # model validation
+    validation_plots(history)
+    validation_metrics(ann, X_test, y_test)
 
     total_end = time.time()
+
+    #save_model_as_tflit(ann)
 
     print(f"Runtime of total program is: {total_end - total_start}")
     print("done")
