@@ -13,11 +13,11 @@ import math
 from matplotlib import pyplot as plt
 import tensorflow as tf # attempting using tensorflow 2.5.0 to match the tflite_runtime tensorflow version
 from pickle import dump
-import sklearn 
 import time 
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score
+import librosa 
 
 
 def load_data():
@@ -117,7 +117,114 @@ def create_chunks(raw_data, samplerate, seconds):
     print(f"Runtime of create_chunks is: {end - start}")
     return chunks_final
 
-def raw_audio_to_freq(chunks, samplerate):
+def inject_noise(chunk, noise_factor): 
+
+    noise = np.random.randn(len(chunk))
+    augmented_chunk = chunk + noise_factor * noise
+    # Cast back to same chunk type
+    augmented_chunk = augmented_chunk.astype(type(chunk[0]))
+
+    return augmented_chunk
+    
+
+def shift_time(chunk, sampling_rate, shift_max, shift_direction):
+    shift = np.random.randint(sampling_rate * shift_max)
+    if shift_direction == 'right':
+        shift = -shift
+    elif shift_direction == 'both':
+        direction = np.random.randint(0, 2)
+        if direction == 1:
+            shift = -shift    
+
+    augmented_chunk = np.roll(chunk, shift)
+    # Set to silence for heading/ tailing
+    if shift > 0:
+        augmented_chunk[:shift] = 0
+    else:
+        augmented_chunk[shift:] = 0
+    return augmented_chunk
+
+
+def change_pitch(chunk, sampling_rate, tone_shifts):
+    # thanks librosa, for your contribution
+    pitch_factor = tone_shifts * 12
+    return librosa.effects.pitch_shift(chunk, sampling_rate, pitch_factor)
+
+def change_speed(chunk, speed_factor):
+    stretched = librosa.effects.time_stretch(chunk, speed_factor)
+
+    if speed_factor > 1:
+        # pad array with zeros to assure correct feature size
+        padding = np.zeros([chunk.shape[0] - stretched.shape[0]])
+        return np.concatenate([stretched, padding])
+
+    elif speed_factor < 1:
+        # trim to meet shape of model input
+        stretched = stretched[:chunk.shape[0]]
+        return stretched
+    else:
+        return chunk
+
+def augment_chunks(chunks, sampling_rate, max_time_shift):
+    # should be able to multiply our dataset by a very significant factor 
+    # inspired by https://medium.com/@makcedward/data-augmentation-for-audio-76912b01fdf6
+
+    # separated for future debugging & validation
+    chunks_noise = []
+    chunks_l_shift = []
+    chunks_r_shift = []
+    chunks_pitch = []
+    chunks_speed = []
+
+    augmented_data = []
+
+    # all operations are done chunk-wise, so must iterate through with functions
+    for idx, chunk in enumerate(chunks):
+        # injecting noise
+        NOISE_FACTOR = 0.2
+        chunk_added_noise = inject_noise(chunk, NOISE_FACTOR)
+        chunks_noise.append(chunk_added_noise)
+
+        # shifting time left
+        shift_max = max_time_shift * 0.5 # in seconds
+        chunk_shifted_l = shift_time(chunk, sampling_rate, shift_max, "left")
+        chunks_l_shift.append(chunk_shifted_l)
+
+        # shifting time right
+        chunk_shifted_r = shift_time(chunk, sampling_rate, shift_max, "right")
+        chunks_r_shift.append(chunk_shifted_r)
+
+        # changing pitch
+        tone_shifts = np.random.uniform(-3, 3) 
+        chunk_changed_pitch = change_pitch(chunk, sampling_rate, tone_shifts)
+        chunks_pitch.append(chunk_changed_pitch)
+
+        # changing speed 
+        speed_shift = np.random.uniform(0.5, 1.5)
+        chunk_speed_shifted = change_speed(chunk, speed_shift)
+        chunks_speed.append(chunk_speed_shifted)
+    
+        # saving data for the correct output
+        # path = "data/"
+        # wav.write(path + "original_{}.wav".format(idx), sampling_rate, chunk.astype(np.float32)) 
+        # wav.write(path + "noise_{}.wav".format(idx), sampling_rate, chunk_shifted_l.astype(np.float32)) 
+        # wav.write(path + "shift_l_{}.wav".format(idx), sampling_rate, chunk_shifted_r.astype(np.float32)) 
+        # wav.write(path + "shift_r_{}.wav".format(idx), sampling_rate, chunk_changed_pitch.astype(np.float32)) 
+        # wav.write(path + "speed_{}.wav".format(idx), sampling_rate, chunk_speed_shifted.astype(np.float32)) 
+ 
+
+
+    # combine data for simple return
+    augmented_data.extend(chunks_noise)
+    augmented_data.extend(chunks_l_shift)
+    augmented_data.extend(chunks_r_shift)
+    augmented_data.extend(chunks_pitch)
+    augmented_data.extend(chunks_speed)
+
+    return np.array(augmented_data)
+
+
+def raw_audio_to_freq(chunks, samplerate): 
     start = time.time()
 
     chunks_Y = []
@@ -143,7 +250,8 @@ def raw_audio_to_freq(chunks, samplerate):
     return chunks_Y, chunks_freqs
 
 # without binning, there would be features on the scale of tens of thousands
-# may need to 
+# may need to bin specific frequency bands that are characteristic for high frequency cyclic items
+# this could be greatly beneficial to separate between the two 
 def bin_chunks_Y(chunks_Y, bins):
     start = time.time()
     chunks_Y_binned = []
@@ -218,20 +326,20 @@ def build_ann(X):
     # Some arbitrary architecture for now
     ann_clf.add(tf.keras.layers.Input(shape=nr_features))
 
-    ann_clf.add(tf.keras.layers.Dense(units=500, activation='relu'))
+    ann_clf.add(tf.keras.layers.Dense(units=nr_features/2, activation='relu'))
     ann_clf.add(tf.keras.layers.Dropout(0.2))
 
-    ann_clf.add(tf.keras.layers.Dense(units=250, activation='relu'))
+    ann_clf.add(tf.keras.layers.Dense(units=nr_features/4, activation='relu'))
     ann_clf.add(tf.keras.layers.Dropout(0.2))
 
-    ann_clf.add(tf.keras.layers.Dense(units=125, activation='relu'))
+    ann_clf.add(tf.keras.layers.Dense(units=nr_features/8, activation='relu'))
     ann_clf.add(tf.keras.layers.Dropout(0.2))
 
-    ann_clf.add(tf.keras.layers.Dense(units=60, activation='relu'))
+    ann_clf.add(tf.keras.layers.Dense(units=nr_features/16, activation='relu'))
     ann_clf.add(tf.keras.layers.Dropout(0.2))
 
-    ann_clf.add(tf.keras.layers.Dense(units=30, activation='relu'))
-    ann_clf.add(tf.keras.layers.Dropout(0.2))
+    # ann_clf.add(tf.keras.layers.Dense(units=30, activation='relu'))
+    # ann_clf.add(tf.keras.layers.Dropout(0.2))
 
     ann_clf.add(tf.keras.layers.BatchNormalization())
     ann_clf.add(tf.keras.layers.Dense(units=1, activation='sigmoid'))
@@ -284,8 +392,8 @@ if __name__ == "__main__":
     #### split audio data into chunks ####
     # conclusion is we need more data
     # Variable data parameters
-    SECONDS = 1
-    BINS = 500
+    SECONDS = 0.5
+    BINS = 2000
     #
 
     total_start = time.time()
@@ -295,6 +403,11 @@ if __name__ == "__main__":
 
     chunks_grinder = create_chunks(raw_data, sample_rate, SECONDS)
     chunks_env = create_chunks(raw_data_environment, sample_rate, SECONDS)
+
+    # # # augment data for some reason, augmentation is not helping accuracy or loss
+    # TODO: investigate what data looks like after being augmented 
+    # chunks_grinder = augment_chunks(chunks_grinder, sample_rate, SECONDS)
+    # chunks_env = augment_chunks(chunks_env, sample_rate, SECONDS)
 
     # Y is a list whose values are individual chunks and columns are frequencies
     chunks_grinder_Y, freqs_grinder  = raw_audio_to_freq(chunks_grinder, sample_rate)
@@ -318,7 +431,7 @@ if __name__ == "__main__":
     ann = build_ann(X)
 
     history = ann.fit(X_train, y_train, validation_data = (X_test, y_test), \
-        batch_size = 60, epochs = 150, \
+        batch_size = 60, epochs = 100, \
         verbose = 1)
 
 
