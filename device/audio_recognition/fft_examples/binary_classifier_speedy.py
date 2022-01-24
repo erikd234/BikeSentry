@@ -169,6 +169,7 @@ def augment_chunks(chunks, sampling_rate, max_time_shift):
     # should be able to multiply our dataset by a very significant factor 
     # inspired by https://medium.com/@makcedward/data-augmentation-for-audio-76912b01fdf6
 
+    start = time.time()
     # separated for future debugging & validation
     chunks_noise = []
     chunks_l_shift = []
@@ -181,12 +182,12 @@ def augment_chunks(chunks, sampling_rate, max_time_shift):
     # all operations are done chunk-wise, so must iterate through with functions
     for idx, chunk in enumerate(chunks):
         # injecting noise
-        NOISE_FACTOR = 0.2
+        NOISE_FACTOR = 0.1
         chunk_added_noise = inject_noise(chunk, NOISE_FACTOR)
         chunks_noise.append(chunk_added_noise)
 
         # shifting time left
-        shift_max = max_time_shift * 0.5 # in seconds
+        shift_max = max_time_shift * 0.25 # in seconds
         chunk_shifted_l = shift_time(chunk, sampling_rate, shift_max, "left")
         chunks_l_shift.append(chunk_shifted_l)
 
@@ -195,7 +196,7 @@ def augment_chunks(chunks, sampling_rate, max_time_shift):
         chunks_r_shift.append(chunk_shifted_r)
 
         # changing pitch
-        tone_shifts = np.random.uniform(-3, 3) 
+        tone_shifts = np.random.uniform(-1, 1) 
         chunk_changed_pitch = change_pitch(chunk, sampling_rate, tone_shifts)
         chunks_pitch.append(chunk_changed_pitch)
 
@@ -215,11 +216,14 @@ def augment_chunks(chunks, sampling_rate, max_time_shift):
 
 
     # combine data for simple return
+    augmented_data.extend(chunks)
     augmented_data.extend(chunks_noise)
     augmented_data.extend(chunks_l_shift)
     augmented_data.extend(chunks_r_shift)
     augmented_data.extend(chunks_pitch)
     augmented_data.extend(chunks_speed)
+    end = time.time()
+    print(f"Runtime of augment_data is: {end - start}")
 
     return np.array(augmented_data)
 
@@ -335,13 +339,13 @@ def build_ann(X):
     ann_clf.add(tf.keras.layers.Dense(units=nr_features/8, activation='relu'))
     ann_clf.add(tf.keras.layers.Dropout(0.2))
 
-    ann_clf.add(tf.keras.layers.Dense(units=nr_features/16, activation='relu'))
-    ann_clf.add(tf.keras.layers.Dropout(0.2))
+    # ann_clf.add(tf.keras.layers.Dense(units=nr_features/16, activation='relu'))
+    # ann_clf.add(tf.keras.layers.Dropout(0.2))
 
     # ann_clf.add(tf.keras.layers.Dense(units=30, activation='relu'))
     # ann_clf.add(tf.keras.layers.Dropout(0.2))
 
-    ann_clf.add(tf.keras.layers.BatchNormalization())
+    # ann_clf.add(tf.keras.layers.BatchNormalization())
     ann_clf.add(tf.keras.layers.Dense(units=1, activation='sigmoid'))
 
     # Compiling
@@ -405,7 +409,10 @@ if __name__ == "__main__":
     chunks_env = create_chunks(raw_data_environment, sample_rate, SECONDS)
 
     # # # augment data for some reason, augmentation is not helping accuracy or loss
+    # interesting response to fft for audio classification: https://dsp.stackexchange.com/questions/8220/performing-classification-based-on-fft-results
     # TODO: investigate what data looks like after being augmented 
+    # TODO: switch features to MFCC's instead of frequencies
+    # TODO: consider making a multi layered classifier... only analyse .wav if the file has over a defined threshold sound amplitude 
     # chunks_grinder = augment_chunks(chunks_grinder, sample_rate, SECONDS)
     # chunks_env = augment_chunks(chunks_env, sample_rate, SECONDS)
 
@@ -431,7 +438,7 @@ if __name__ == "__main__":
     ann = build_ann(X)
 
     history = ann.fit(X_train, y_train, validation_data = (X_test, y_test), \
-        batch_size = 60, epochs = 100, \
+        batch_size = 100, epochs = 100, \
         verbose = 1)
 
 
