@@ -4,6 +4,9 @@ import wave
 import pyaudio
 
 def record_audio(seconds, filename):
+    '''
+    Record a .wav file for a defined amount of seconds. Output to a user defined filename.
+    '''
     form_1 = pyaudio.paInt16 # 16-bit resolution
     chans = 1 # 1 channel
     samp_rate = 44100 # 44.1kHz sampling rate
@@ -48,6 +51,7 @@ if __name__ == "__main__":
     base_file_name = "recording_{n}"
     counter = 0
 
+    # record audio until told otherwise
     while(True):
         record_audio(SECONDS, base_file_name.format(n = counter) + '.wav')
         counter += 1
