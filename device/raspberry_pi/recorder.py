@@ -18,7 +18,7 @@ def record_audio(seconds, filename):
     stream = audio.open(format = form_1,rate = samp_rate,channels = chans, \
                         input_device_index = dev_index,input = True, \
                         frames_per_buffer=chunk)
-    print("recording")
+    print("\n\n\n\n\nRecording {} Started".filename)
     frames = []
 
     # loop through stream and append audio chunks to frame array
@@ -26,7 +26,7 @@ def record_audio(seconds, filename):
         data = stream.read(chunk)
         frames.append(data)
 
-    print("finished recording")
+    print("Finished Recording")
 
     # stop the stream, close it, and terminate the pyaudio instantiation
     stream.stop_stream()
@@ -48,5 +48,5 @@ if __name__ == "__main__":
     counter = 0
 
     while(True):
-        record_audio(SECONDS, base_file_name.format(n = counter))
+        record_audio(SECONDS, base_file_name.format(n = counter) + '.wav')
         counter += 1
