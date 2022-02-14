@@ -227,6 +227,31 @@ def augment_chunks(chunks, sampling_rate, max_time_shift):
 
     return np.array(augmented_data)
 
+def raw_audio_to_freq(chunks, samplerate): 
+    start = time.time()
+
+    chunks_Y = []
+    chunks_freqs = []
+    for chunk in chunks:
+        n = len(chunk) # length of the signal
+        k = np.arange(n)
+        T = n/samplerate
+        
+        frq = k/T # two sides frequency range
+        
+        zz=int(n/2)
+        freq = frq[range(zz)]  # one side frequency range
+        Y0 = np.fft.fft(chunk)/n  # fft computing and normalization
+        Y = Y0[range(zz)]
+        chunks_Y.append(abs(Y))
+        chunks_freqs.append(freq)
+    #plt.plot(freq, abs(Y))
+    #plt.xlim([freq_max - 100, freq_max + 100])
+    
+    end = time.time()
+    print(f"Runtime of raw_audio_to_freq is: {end - start}")
+    return chunks_Y, chunks_freqs
+
 def get_mfcc(chunks, samplerate):
     # making an array of MFCC's from librosa
     # output needs to be shaped so that each row is a chunk
@@ -257,7 +282,7 @@ def scale_Y(chunks_grinder_Y: np.array, chunks_env_Y: np.array):
     X_e_scaled = X_combined_scaled[(n_rows_g):, :]
 
     # save scaler for future realtime scaling
-    pickle.dump(sc, open('mfcc_scaler.pkl', 'wb'))
+    #pickle.dump(sc, open('mfcc_scaler.pkl', 'wb'))
     end = time.time()
 
     print(f"Runtime of scale_Y is: {end - start}")
@@ -298,8 +323,6 @@ if __name__ == "__main__":
     # conclusion is we need more data
     # Variable data parameters
     SECONDS = 0.5
-    BINS = 2000
-    #
 
     total_start = time.time()
 
@@ -332,7 +355,7 @@ if __name__ == "__main__":
     total_end = time.time()
 
     # save model
-    dump(svc, 'binary_classifier.joblib')
+    #dump(svc, 'binary_classifier.joblib')
     
 
     print(f"Runtime of total program is: {total_end - total_start}")
