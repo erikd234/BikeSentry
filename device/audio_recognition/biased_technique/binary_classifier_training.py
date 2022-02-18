@@ -42,6 +42,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score
 import librosa 
 from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import SGDClassifier
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.ensemble import RandomForestClassifier
 
 
 def load_data():
@@ -265,8 +269,26 @@ def split_data(X, y):
 
 def build_svc(X, y):
     
-    cls = SVC().fit(X, y)
+    cls = SVC(kernel = "rbf").fit(X, y)
 
+    return cls
+
+def build_rf(X, y):
+    cls = RandomForestClassifier()
+    cls.fit(X, y)
+    
+    return cls
+
+def build_knn(X, y):
+    cls = KNeighborsClassifier()
+    cls.fit(X, y)
+    
+    return cls
+
+def build_sgd(X, y):
+    cls = SGDClassifier(random_state = 0)
+    cls.fit(X, y)
+    
     return cls
 
 def n_max(arr, n):
@@ -285,9 +307,7 @@ def n_max(arr, n):
     return m
 
 def predictor_1(amplitudes):
-    """_summary_
-
-    Find the maximum column in each row of np.array
+    """Find the maximum column in each row of np.array
     Args:
         amplitudes (np.array): 2d array with cols as amplitudes and rows as samples
 
@@ -363,10 +383,33 @@ if __name__ == "__main__":
 
     # build classifier
     svc = build_svc(X_train, y_train.ravel())
-    print("Classification Accuracy: {}".format(svc.score(X_test, y_test)))
+    print("SVC Accuracy: {}".format(svc.score(X_test, y_test)))
 
+    # testing many modelsf
+    knn = build_knn(X_train, y_train.ravel())
+    print("KNN Accuracy: {}".format(knn.score(X_test, y_test)))
+
+    rf = build_rf(X_train, y_train.ravel())
+    print("Random Forest Accuracy: {}".format(rf.score(X_test, y_test)))
+    
+    sgd = build_sgd(X_train, y_train.ravel())
+    print("SGD Accuracy: {}".format(sgd.score(X_test, y_test)))
+    
     # confusion matrix
+    print("SVC Confusion Matrix")
     print(confusion_matrix(y, svc.predict(X)))
+    
+    # confusion matrix
+    print("KNN Confusion Matrix")
+    print(confusion_matrix(y, knn.predict(X)))
+    
+    # confusion matrix
+    print("Random Forest Confusion Matrix")
+    print(confusion_matrix(y, rf.predict(X)))
+    
+    # confusion matrix
+    print("SGD Confusion Matrix")
+    print(confusion_matrix(y, sgd.predict(X)))
     
     total_end = time.time()
 
