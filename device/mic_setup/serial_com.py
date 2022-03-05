@@ -43,5 +43,5 @@ def get_serial_data(br = 9600, duration = 10, f = 17e3):
 
 if __name__ == "__main__":
     active_ports() 
-    d = get_serial_data(br = 38400)
+    d = get_serial_data(br = 2000000)
     print(len(d))
