@@ -3,3 +3,4 @@ cloud/back-end/.idea
 cloud/back-end/__pycache__/
 cloud/back-end/.env
 *.cache
+*.wav
