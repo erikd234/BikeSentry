@@ -41,5 +41,6 @@ void setup() {
 
 void loop() 
 {
-  Serial.println(analogRead(0) - 500);
+  analogReadResolution(8);
+  Serial.println(analogRead(0));
 }
