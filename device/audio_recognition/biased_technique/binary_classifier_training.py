@@ -1,12 +1,12 @@
 # The ethos of this training regime is to take what I know about the data
 # and create a biased way of preprocessing in order to make loud, cyclic
-# audio very recognizable. 
+# audio very recognizable.
 
 # I need to look at recordings of other cyclic things such as saws, drills,
 # mills, etc. to see if they differ a lot between each other
 
 # I also need to look at normal environmental sounds as well as common
-# noise from our microphone. 
+# noise from our microphone.
 
 # Fine scale features may not be necessary at all so doing a translation subtraction
 # of amplitude from an FFT might be beneficial to get rid of noise
@@ -14,11 +14,11 @@
 # Feature ideas:
 # - count of frequencies that have amplitudes higher than a threshold
 # - bound frequencies that we care about (e.g. get rid of 0-1kHz which is common in human speech)
-# 
+#
 
 # The average maximum amplitude in environment noise: 0.003119
 # '      '       '         '     ' angle grinder    : 0.0176
-# They're on a different order of magnitude 
+# They're on a different order of magnitude
 # try: y_grinder - mean_max_y_env & y_env - mean_max_y_env
 
 # Feb 13 2022
@@ -36,11 +36,11 @@ import math
 from matplotlib import pyplot as plt
 from joblib import dump
 import pickle
-import time 
+import time
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score
-import librosa 
+import librosa
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import SGDClassifier
@@ -54,16 +54,16 @@ def load_data():
     start = time.time()
 
     for root, dirs, files in os.walk("../data/"):
-        for file in files:  
+        for file in files:
             # samplerate is constant from the same recording device. If not iPhone XR, do not do this!!!!!
-            if("grinder" in file):
+            if "grinder" in file:
                 samplerate, y = wav.read(root + file)
                 raw_angle_grinders.append(y)
-        
-            if("env" in file):
+
+            if "env" in file:
                 samplerate, y = wav.read(root + file)
                 raw_environ.append(y)
-    
+
     # see how much data we are processing to make runtimes relative
     total_recorded_data = 0
     for rec in raw_angle_grinders:
@@ -79,7 +79,7 @@ def load_data():
     return raw_angle_grinders, raw_environ, samplerate
 
 
-def inject_noise(chunk, noise_factor): 
+def inject_noise(chunk, noise_factor):
 
     noise = np.random.randn(len(chunk))
     augmented_chunk = chunk + noise_factor * noise
@@ -87,16 +87,16 @@ def inject_noise(chunk, noise_factor):
     augmented_chunk = augmented_chunk.astype(type(chunk[0]))
 
     return augmented_chunk
-    
+
 
 def shift_time(chunk, sampling_rate, shift_max, shift_direction):
     shift = np.random.randint(sampling_rate * shift_max)
-    if shift_direction == 'right':
+    if shift_direction == "right":
         shift = -shift
-    elif shift_direction == 'both':
+    elif shift_direction == "both":
         direction = np.random.randint(0, 2)
         if direction == 1:
-            shift = -shift    
+            shift = -shift
 
     augmented_chunk = np.roll(chunk, shift)
     # Set to silence for heading/ tailing
@@ -112,6 +112,7 @@ def change_pitch(chunk, sampling_rate, tone_shifts):
     pitch_factor = tone_shifts * 12
     return librosa.effects.pitch_shift(chunk, sampling_rate, pitch_factor)
 
+
 def change_speed(chunk, speed_factor):
     stretched = librosa.effects.time_stretch(chunk, speed_factor)
 
@@ -122,13 +123,14 @@ def change_speed(chunk, speed_factor):
 
     elif speed_factor < 1:
         # trim to meet shape of model input
-        stretched = stretched[:chunk.shape[0]]
+        stretched = stretched[: chunk.shape[0]]
         return stretched
     else:
         return chunk
 
+
 def augment_chunks(chunks, sampling_rate, max_time_shift):
-    # should be able to multiply our dataset by a very significant factor 
+    # should be able to multiply our dataset by a very significant factor
     # inspired by https://medium.com/@makcedward/data-augmentation-for-audio-76912b01fdf6
 
     start = time.time()
@@ -149,7 +151,7 @@ def augment_chunks(chunks, sampling_rate, max_time_shift):
         chunks_noise.append(chunk_added_noise)
 
         # shifting time left
-        shift_max = max_time_shift * 0.25 # in seconds
+        shift_max = max_time_shift * 0.25  # in seconds
         chunk_shifted_l = shift_time(chunk, sampling_rate, shift_max, "left")
         chunks_l_shift.append(chunk_shifted_l)
 
@@ -158,24 +160,22 @@ def augment_chunks(chunks, sampling_rate, max_time_shift):
         chunks_r_shift.append(chunk_shifted_r)
 
         # changing pitch
-        tone_shifts = np.random.uniform(-1, 1) 
+        tone_shifts = np.random.uniform(-1, 1)
         chunk_changed_pitch = change_pitch(chunk, sampling_rate, tone_shifts)
         chunks_pitch.append(chunk_changed_pitch)
 
-        # changing speed 
+        # changing speed
         speed_shift = np.random.uniform(0.5, 1.5)
         chunk_speed_shifted = change_speed(chunk, speed_shift)
         chunks_speed.append(chunk_speed_shifted)
-    
+
         # saving data for the correct output
         # path = "data/"
-        # wav.write(path + "original_{}.wav".format(idx), sampling_rate, chunk.astype(np.float32)) 
-        # wav.write(path + "noise_{}.wav".format(idx), sampling_rate, chunk_shifted_l.astype(np.float32)) 
-        # wav.write(path + "shift_l_{}.wav".format(idx), sampling_rate, chunk_shifted_r.astype(np.float32)) 
-        # wav.write(path + "shift_r_{}.wav".format(idx), sampling_rate, chunk_changed_pitch.astype(np.float32)) 
-        # wav.write(path + "speed_{}.wav".format(idx), sampling_rate, chunk_speed_shifted.astype(np.float32)) 
- 
-
+        # wav.write(path + "original_{}.wav".format(idx), sampling_rate, chunk.astype(np.float32))
+        # wav.write(path + "noise_{}.wav".format(idx), sampling_rate, chunk_shifted_l.astype(np.float32))
+        # wav.write(path + "shift_l_{}.wav".format(idx), sampling_rate, chunk_shifted_r.astype(np.float32))
+        # wav.write(path + "shift_r_{}.wav".format(idx), sampling_rate, chunk_changed_pitch.astype(np.float32))
+        # wav.write(path + "speed_{}.wav".format(idx), sampling_rate, chunk_speed_shifted.astype(np.float32))
 
     # combine data for simple return
     augmented_data.extend(chunks)
@@ -189,60 +189,64 @@ def augment_chunks(chunks, sampling_rate, max_time_shift):
 
     return np.array(augmented_data)
 
-def raw_audio_to_freq(chunks, samplerate): 
+
+def raw_audio_to_freq(chunks, samplerate):
     start = time.time()
 
     chunks_Y = []
     chunks_freqs = []
     for chunk in chunks:
-        n = len(chunk) # length of the signal
+        n = len(chunk)  # length of the signal
         k = np.arange(n)
-        T = n/samplerate
-        
-        frq = k/T # two sides frequency range
-        
-        zz=int(n/2)
+        T = n / samplerate
+
+        frq = k / T  # two sides frequency range
+
+        zz = int(n / 2)
         freq = frq[range(zz)]  # one side frequency range
-        Y0 = np.fft.fft(chunk)/n  # fft computing and normalization
+        Y0 = np.fft.fft(chunk) / n  # fft computing and normalization
         Y = Y0[range(zz)]
         chunks_Y.append(abs(Y))
         chunks_freqs.append(freq)
-    #plt.plot(freq, abs(Y))
-    #plt.xlim([freq_max - 100, freq_max + 100])
-    
+    # plt.plot(freq, abs(Y))
+    # plt.xlim([freq_max - 100, freq_max + 100])
+
     end = time.time()
     print(f"Runtime of raw_audio_to_freq is: {end - start}")
     return np.array(chunks_Y), np.array(chunks_freqs)
 
+
 def remove_freqs(amplitudes, freqs, min, max):
-    '''
+    """
     Get rid of frequencies between min & max 
-    '''
+    """
     f = ~((freqs >= min) & (freqs <= max))[0]
-    return amplitudes[:,f], freqs[0, f]
+    return amplitudes[:, f], freqs[0, f]
+
 
 def scale_Y(chunks_grinder_Y: np.array, chunks_env_Y: np.array):
     # scaling may be better to use log scale instead of this -1 to 1 scale but that can be fixed later
     start = time.time()
 
     sc = StandardScaler()
-    # first row is the bin values 
+    # first row is the bin values
     n_rows_g = chunks_grinder_Y.shape[0]
     n_rows_e = chunks_env_Y.shape[0]
 
     X_combined = np.vstack([chunks_grinder_Y, chunks_env_Y])
     X_combined_scaled = sc.fit_transform(X_combined)
-    
+
     X_g_scaled = X_combined_scaled[:n_rows_g, :]
     X_e_scaled = X_combined_scaled[(n_rows_g):, :]
 
     # save scaler for future realtime scaling
-    #pickle.dump(sc, open('mfcc_scaler.pkl', 'wb'))
+    # pickle.dump(sc, open('mfcc_scaler.pkl', 'wb'))
     end = time.time()
 
     print(f"Runtime of scale_Y is: {end - start}")
 
     return X_g_scaled, X_e_scaled
+
 
 def categorize_data(X_grinder, X_env):
     start = time.time()
@@ -254,42 +258,50 @@ def categorize_data(X_grinder, X_env):
     # reshape to be vertical
 
     classes = np.vstack(classes_h)
-    
+
     end = time.time()
 
     print(f"Runtime of categorize_data is: {end - start}")
     return classes
 
+
 def split_data(X, y):
-    # can change this from not being dependent on sklearn if we want to know the training things but 
+    # can change this from not being dependent on sklearn if we want to know the training things but
     # no need to think about that now
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 1)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.3, random_state=1
+    )
 
     return X_train, X_test, y_train, y_test
 
+
 def build_svc(X, y):
-    
-    cls = SVC(kernel = "rbf").fit(X, y)
+
+    cls = SVC(kernel="rbf").fit(X, y)
 
     return cls
+
 
 def build_rf(X, y):
     cls = RandomForestClassifier()
     cls.fit(X, y)
-    
+
     return cls
+
 
 def build_knn(X, y):
     cls = KNeighborsClassifier()
     cls.fit(X, y)
-    
+
     return cls
 
+
 def build_sgd(X, y):
-    cls = SGDClassifier(random_state = 0)
+    cls = SGDClassifier(random_state=0)
     cls.fit(X, y)
-    
+
     return cls
+
 
 def n_max(arr, n):
     """ Find the n largest maximum value in an array. Intented to be used with np.apply_along_axis()
@@ -303,8 +315,9 @@ def n_max(arr, n):
     """
     s = np.sort(arr)
     m = s[-n]
-    
+
     return m
+
 
 def predictor_1(amplitudes):
     """Find the maximum column in each row of np.array
@@ -315,29 +328,33 @@ def predictor_1(amplitudes):
         np.array: maximum rowwise amplitudes from input array
     """
     p1 = np.apply_along_axis(n_max, 1, amplitudes, 1)
-    
+
     return p1
+
 
 def predictor_2(amplitudes):
     p2 = np.apply_along_axis(n_max, 1, amplitudes, 2)
-    
+
     return p2
-    
+
+
 def predictor_3(amplitudes):
     p3 = np.apply_along_axis(n_max, 1, amplitudes, 3)
-    
+
     return p3
+
 
 def get_predictors(amplitudes):
     n_preds = 3
     # create empty array to populate
     X = np.zeros((amplitudes.shape[0], n_preds))
-    
+
     X[:, 0] = predictor_1(amplitudes)
     X[:, 1] = predictor_2(amplitudes)
     X[:, 2] = predictor_3(amplitudes)
 
     return X
+
 
 if __name__ == "__main__":
     #### split audio data into chunks ####
@@ -351,33 +368,35 @@ if __name__ == "__main__":
 
     X_grinder, freqs_grinder = raw_audio_to_freq(snippets_grinder, sample_rate)
     X_env, freqs_env = raw_audio_to_freq(snippets_env, sample_rate)
-    
+
     # remove human speech frequencies 0 - 1000 kHz
-    min_freq = 0 #kHz
-    max_freq = 1000 #kHz
-    
-    X_grinder_trunc, freqs_grinder_trunc = remove_freqs(X_grinder, freqs_grinder, min_freq, max_freq)
+    min_freq = 0  # kHz
+    max_freq = 1000  # kHz
+
+    X_grinder_trunc, freqs_grinder_trunc = remove_freqs(
+        X_grinder, freqs_grinder, min_freq, max_freq
+    )
     X_env_trunc, freqs_env_trunc = remove_freqs(X_env, freqs_env, min_freq, max_freq)
-    
+
     # predictor creation
-    # Predictor 1: max amplitude 
+    # Predictor 1: max amplitude
     # Predictor 2: second max amplitude
     # Predictor 3: third max amplitude
-    
+
     X_g = get_predictors(X_grinder_trunc)
     X_e = get_predictors(X_env_trunc)
-    
+
     # convert to dB scale
     X_g = 20 * np.log(X_g)
     X_e = 20 * np.log(X_e)
-    
-    # scaling X's 
+
+    # scaling X's
     X_g_scaled, X_e_scaled = scale_Y(X_g, X_e)
 
     # create categories for grinder and eironment
     y = categorize_data(X_g_scaled, X_e_scaled)
     X = np.vstack([X_g_scaled, X_e_scaled])
-    
+
     # split data to test and train groups
     X_train, X_test, y_train, y_test = split_data(X, y)
 
@@ -391,31 +410,30 @@ if __name__ == "__main__":
 
     rf = build_rf(X_train, y_train.ravel())
     print("Random Forest Accuracy: {}".format(rf.score(X_test, y_test)))
-    
+
     sgd = build_sgd(X_train, y_train.ravel())
     print("SGD Accuracy: {}".format(sgd.score(X_test, y_test)))
-    
+
     # confusion matrix
     print("SVC Confusion Matrix")
     print(confusion_matrix(y, svc.predict(X)))
-    
+
     # confusion matrix
     print("KNN Confusion Matrix")
     print(confusion_matrix(y, knn.predict(X)))
-    
+
     # confusion matrix
     print("Random Forest Confusion Matrix")
     print(confusion_matrix(y, rf.predict(X)))
-    
+
     # confusion matrix
     print("SGD Confusion Matrix")
     print(confusion_matrix(y, sgd.predict(X)))
-    
+
     total_end = time.time()
 
     # save model
-    #dump(svc, 'binary_classifier.joblib')
-    
+    # dump(svc, 'binary_classifier.joblib')
 
     print(f"Runtime of total program is: {total_end - total_start}")
     print("done")
