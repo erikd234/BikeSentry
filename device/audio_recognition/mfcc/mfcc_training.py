@@ -27,23 +27,18 @@ def load_data():
     start = time.time()
 
     for root, dirs, files in os.walk(
-        "C:/Users/adamf/OneDrive/Documents/university/UBC/homework_Winter_2021/Term 2/IGEN_330/BikeSentry_data/angle-grinders/"
+        "C:/Users/adamf/OneDrive/Documents/code/BikeSentry/device/recordings/"
     ):
         for file in files:
-            # samplerate is constant from the same recording device. If not iPhone XR, do not do this!!!!!
-            if "trimmed" in file:
+            if "grinder" in file:
                 samplerate, y = wav.read(root + file)
-                y0 = y[:, 0]
-                y1 = y[:, 1]
-                raw_angle_grinders.append(y0)
-                raw_angle_grinders.append(y1)
+                raw_angle_grinders.append(y)
+                #raw_angle_grinders.append(y1)
 
-            if "envi" in file:
+            if "env" in file:
                 samplerate, y = wav.read(root + file)
-                y0 = y[:, 0]
-                y1 = y[:, 1]
-                raw_environ.append(y0)
-                raw_environ.append(y1)
+                raw_environ.append(y)
+                #raw_environ.append(y1)
 
     # see how much data we are processing to make runtimes relative
     total_recorded_data = 0
@@ -289,8 +284,11 @@ def scale_Y(chunks_grinder_Y: np.array, chunks_env_Y: np.array):
     X_g_scaled = X_combined_scaled[:n_rows_g, :]
     X_e_scaled = X_combined_scaled[(n_rows_g):, :]
 
+    save_model = True
+    if (save_model):   
     # save scaler for future realtime scaling
-    # pickle.dump(sc, open('mfcc_scaler.pkl', 'wb'))
+        pickle.dump(sc, open('mfcc_scaler.pkl', 'wb'))
+        
     end = time.time()
 
     print(f"Runtime of scale_Y is: {end - start}")
@@ -359,7 +357,7 @@ if __name__ == "__main__":
     # split data to test and train groups
     X_train, X_test, y_train, y_test = split_data(X, y)
 
-    # build ann model
+    # build svc model
     svc = build_svc(X_train, y_train.ravel())
     print("Classification Accuracy: {}".format(svc.score(X_test, y_test)))
 
@@ -369,7 +367,10 @@ if __name__ == "__main__":
     total_end = time.time()
 
     # save model
-    # dump(svc, 'binary_classifier.joblib')
+    save_model = False
+    
+    if (save_model):
+        dump(svc, 'binary_classifier.joblib')
 
     print(f"Runtime of total program is: {total_end - total_start}")
     print("done")
