@@ -260,6 +260,7 @@ def get_mfcc(chunks, samplerate):
     start = time.time()
 
     data = []
+    print(chunks.dtype)
     for chunk in chunks:
         data.append(librosa.feature.mfcc(chunk, sr=samplerate).flatten())
 
@@ -334,7 +335,7 @@ if __name__ == "__main__":
     #### split audio data into chunks ####
     # conclusion is we need more data
     # Variable data parameters
-    SECONDS = 0.5
+    SECONDS = 2
 
     total_start = time.time()
 
@@ -352,7 +353,7 @@ if __name__ == "__main__":
 
     # create categories for grinder and environment
     y = categorize_data(X_grinder_scaled, X_env_scaled)
-    X = np.vstack([X_grinder_scaled, X_env_scaled])
+    X = np.vstack([X_env_scaled, X_grinder_scaled])
 
     # split data to test and train groups
     X_train, X_test, y_train, y_test = split_data(X, y)
@@ -367,7 +368,7 @@ if __name__ == "__main__":
     total_end = time.time()
 
     # save model
-    save_model = False
+    save_model = True
     
     if (save_model):
         dump(svc, 'binary_classifier.joblib')
